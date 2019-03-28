@@ -42,7 +42,7 @@ int onebyte_release(struct inode *inode, struct file *filep)
 
 ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos)
 {    /*please complete the function on your own*/
-     int bytes_read = 0;
+     int byte_read = 0;
      
      /* Check if the buffer has been written */
      if(*buf != 0){
@@ -50,14 +50,14 @@ ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos)
      }
      copy_to_user(buf, onebyte_data, sizeof(char));
      
-     bytes_read ++;
-     return bytes_read;
+     byte_read ++;
+     return byte_read;
 }
 
 ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t *f_pos)
 {
      /*please complete the function on your own*/
-     int bytes_write = 0;     
+     int byte_write = 0;     
      copy_from_user(onebyte_data, buf, sizeof(char));
 
      /* Check the length of the bytes that have been written*/
@@ -65,12 +65,12 @@ ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t 
      {
           printk(KERN_ALERT "No space left on device\n");
 
-          /*Return Linux System Error<28>: No space left on device */
+          /* Linux System Error - ENOSPC: No space left on device */
           return -ENOSPC; 
      }
 
-     bytes_write ++;
-     return bytes_write;
+     byte_write ++;
+     return byte_write;
 }
 
 static int onebyte_init(void)
