@@ -9,6 +9,7 @@ Output files:
     SRTF.txt
     SJF.txt
 '''
+import copy
 import sys
 from collections import deque
 
@@ -49,6 +50,7 @@ def FCFS_scheduling(process_list):
 def RR_scheduling(process_list, time_quantum ):
     schedule = []
     num_of_process = len(process_list)
+    processes = copy.deepcopy(process_list)
     ready_queue = deque()  # using double ended queue to simulate ready queue under RR scheduling algo
     process_expired_quantum = None  # add process expired its quantum to the very end even to break the tie
     current_time = 0
@@ -57,7 +59,7 @@ def RR_scheduling(process_list, time_quantum ):
         completed = True
 
         tmp = []
-        for process in process_list:
+        for process in processes:
             # check arrival time of process, append to ready_queue if it's less than current time
             if process.arrive_time <= current_time:
                 ready_queue.append(process)
@@ -67,10 +69,10 @@ def RR_scheduling(process_list, time_quantum ):
 
         # remove arrived process from process list, prevent from re-adding
         for arrived_process in tmp:
-            process_list.remove(arrived_process)
+            processes.remove(arrived_process)
 
         # there are processes to be execute but yet arrived
-        if process_list and not ready_queue:
+        if processes and not ready_queue:
             completed = False
             current_time += 1
 
@@ -94,7 +96,58 @@ def RR_scheduling(process_list, time_quantum ):
 
 
 def SRTF_scheduling(process_list):
-    return (["to be completed, scheduling process_list on SRTF, using process.burst_time to calculate the remaining time of the current process "], 0.0)
+    ready_queue = deque()
+    processes = copy.deepcopy(process_list)
+    running_process = None
+    schedule = []
+    num_of_process = len(process_list)
+    current_time = 0
+    waiting_time = 0
+    while(1):
+        # in this task we don't need to handle processes arrive at the same time
+        process = [process for process in processes if process.arrive_time == current_time]
+        process = next(iter(process)) if process else None
+
+        if not process:
+            current_time += 1
+            if running_process:
+                running_process.burst_time -= 1
+        else:
+            # initialize the running process as the 1st arrived process
+            if not running_process:
+                running_process = process
+            # assumption:
+            # current running process has the shortest burst time
+            # preempt current running process only if the arrived process has smaller burst time
+            if running_process.burst_time <= process.burst_time:
+                current_time += 1
+                running_process.burst_time -= 1
+                if running_process.id != process.id:  # special handling for the first process
+                    ready_queue.append(process)
+            else:
+                current_time += 1
+                preempted_process = running_process  # preempt running process, append to the end of the queue
+                ready_queue.append(preempted_process)
+                running_process = process
+                running_process.burst_time -= 1
+
+        if running_process and running_process.burst_time == 0:
+            schedule.append((current_time, running_process.id))
+            waiting_time += (current_time - running_process.arrive_time)
+            processes.remove(running_process)  # remove process from list once completed
+            # select the process with the shortest burst time to run
+            if not ready_queue:
+                running_process = None
+            else:
+                # sort in ascending burst time
+                ready_queue = deque(sorted(ready_queue, key=lambda p: p.burst_time, reverse=False))
+                running_process = ready_queue.popleft()
+
+        completed = True if not running_process and not processes else False
+        if completed:
+            break
+
+    return (schedule, waiting_time/float(num_of_process))
 
 
 def SJF_scheduling(process_list, alpha):
