@@ -10,6 +10,7 @@ Output files:
     SJF.txt
 '''
 import sys
+from collections import deque
 
 input_file = 'input.txt'
 
@@ -47,25 +48,49 @@ def FCFS_scheduling(process_list):
 # Output_2 : Average Waiting Time
 def RR_scheduling(process_list, time_quantum ):
     schedule = []
+    num_of_process = len(process_list)
+    ready_queue = deque()  # using double ended queue to simulate ready queue under RR scheduling algo
+    process_expired_quantum = None  # add process expired its quantum to the very end even to break the tie
     current_time = 0
     waiting_time = 0
     while(1):
         completed = True
 
+        tmp = []
         for process in process_list:
-            if process.burst_time > 0:
-                completed = False
-                if process.burst_time > time_quantum:
-                    current_time += time_quantum
-                    process.burst_time -= time_quantum
-                else:
-                    current_time += process.burst_time
-                    process.burst_time = 0
-                    schedule.append((current_time, process.id))
-                    waiting_time += (current_time - process.arrive_time)
+            # check arrival time of process, append to ready_queue if it's less than current time
+            if process.arrive_time <= current_time:
+                ready_queue.append(process)
+                tmp.append(process)
+        if process_expired_quantum:
+            ready_queue.append(process_expired_quantum)
+
+        # remove arrived process from process list, prevent from re-adding
+        for arrived_process in tmp:
+            process_list.remove(arrived_process)
+
+        # there are processes to be execute but yet arrived
+        if process_list and not ready_queue:
+            completed = False
+            current_time += 1
+
+        # waiting for process to arrive or complete executing all processes
+        running_process = ready_queue.popleft() if ready_queue else None
+        if running_process and running_process.burst_time > 0:
+            completed = False
+            if running_process.burst_time > time_quantum:
+                current_time += time_quantum
+                running_process.burst_time -= time_quantum
+                process_expired_quantum = running_process  # append non-completed process at the end of the queue
+            else:
+                current_time += running_process.burst_time
+                process_expired_quantum = None  # remove completed process from ready queue
+                schedule.append((current_time, running_process.id))
+                waiting_time += (current_time - running_process.arrive_time)
+
         if completed:
             break
-    return (schedule, waiting_time/float(len(process_list)))
+    return (schedule, waiting_time/float(num_of_process))
 
 
 def SRTF_scheduling(process_list):
