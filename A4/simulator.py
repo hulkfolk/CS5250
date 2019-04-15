@@ -19,10 +19,11 @@ input_file = 'input.txt'
 class Process:
     last_scheduled_time = 0
 
-    def __init__(self, id, arrive_time, burst_time):
+    def __init__(self, id, arrive_time, burst_time, priority=10000):
         self.id = id
         self.arrive_time = arrive_time
         self.burst_time = burst_time
+        self.priority = priority  # enrich Process class to keep track of priority
 
     # for printing purpose
     def __repr__(self):
@@ -151,7 +152,53 @@ def SRTF_scheduling(process_list):
 
 
 def SJF_scheduling(process_list, alpha):
-    return (["to be completed, scheduling SJF without using information from process.burst_time"],0.0)
+    processes = copy.deepcopy(process_list)
+    num_of_processes = len(processes)
+    ready_queue = deque()
+    schedule = []
+    current_time = 0
+    waiting_time = 0
+    future_predict = {}
+    while(1):
+        tmp = []
+        for process in processes:
+            # add process with calculated priority to ready queue if arrived
+            if process.arrive_time <= current_time:
+                if process.id not in future_predict:
+                    process.priority = 5  # use initial guess for new process
+                    future_predict[process.id] = {"last_prediction": 5}
+                else:
+                    priority = alpha * future_predict[process.id]["last_actual_burst"] + (1 - alpha) * future_predict[process.id]["last_prediction"]
+                    process.priority = priority
+                    future_predict[process.id]["last_prediction"] = priority
+                tmp.append(process)
+                # append new process to ready queue and sort
+                # ensure the left most process in the queue has the highest priority
+                ready_queue.append(process)
+                ready_queue = deque(sorted(ready_queue, key=lambda x: x.priority))
+
+        for process in tmp:
+            processes.remove(process)
+
+        running_process = ready_queue.popleft() if ready_queue else None
+        if running_process:
+            # current running process has the shortest burst time based on prediction
+            # other processes have to wait until it's completed
+            # behave like FCFS here
+            current_time += running_process.burst_time
+            schedule.append((current_time, running_process.id))
+            waiting_time += (current_time - running_process.arrive_time)
+            future_predict[running_process.id]["last_actual_burst"] = running_process.burst_time  # update param for next prediciton
+
+        # waiting for new process to arrive
+        if processes and not running_process:
+            current_time += 1
+
+        completed = True if not processes and not ready_queue else False
+        if completed:
+            break
+
+    return (schedule, waiting_time/float(num_of_processes))
 
 
 def read_input():
