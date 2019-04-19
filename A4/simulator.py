@@ -80,6 +80,7 @@ def RR_scheduling(process_list, time_quantum ):
         # waiting for process to arrive or complete executing all processes
         running_process = ready_queue.popleft() if ready_queue else None
         if running_process and running_process.burst_time > 0:
+            schedule.append((current_time, running_process.id))
             completed = False
             if running_process.burst_time > time_quantum:
                 current_time += time_quantum
@@ -88,8 +89,9 @@ def RR_scheduling(process_list, time_quantum ):
             else:
                 current_time += running_process.burst_time
                 process_expired_quantum = None  # remove completed process from ready queue
-                schedule.append((current_time, running_process.id))
-                waiting_time += (current_time - running_process.arrive_time)
+                # use original process burst time which is not modified to calculate waiting time
+                original_process = next(iter([process for process in process_list if process.id == running_process.id and process.arrive_time == running_process.arrive_time]))
+                waiting_time += (current_time - running_process.arrive_time - original_process.burst_time)
 
         if completed:
             break
@@ -109,32 +111,41 @@ def SRTF_scheduling(process_list):
         process = [process for process in processes if process.arrive_time == current_time]
         process = next(iter(process)) if process else None
 
-        if not process:
+        # waiting for new process to arrive
+        if not process and not running_process:
             current_time += 1
-            if running_process:
-                running_process.burst_time -= 1
         else:
             # initialize the running process as the 1st arrived process
             if not running_process:
                 running_process = process
+                # used  as flag to write to output file
+                # write to output iff a new process start running, either newly arrived or shorter remaining time
+                change_of_running_process = True
+
             # assumption:
             # current running process has the shortest burst time
-            # preempt current running process only if the arrived process has smaller burst time
-            if running_process.burst_time <= process.burst_time:
-                current_time += 1
-                running_process.burst_time -= 1
+            # preempt current running process only if the arrived process has smaller burst time than the remaining time of current process
+            # if there is no new process comes in, complete current process in the ready queue
+            if process and running_process.burst_time <= process.burst_time:
                 if running_process.id != process.id:  # special handling for the first process
                     ready_queue.append(process)
-            else:
-                current_time += 1
+                    change_of_running_process = False
+            if process and running_process.burst_time > process.burst_time:
                 preempted_process = running_process  # preempt running process, append to the end of the queue
                 ready_queue.append(preempted_process)
                 running_process = process
-                running_process.burst_time -= 1
+                change_of_running_process = True
+
+            # write to output only if running process changed to another process
+            if change_of_running_process:
+                schedule.append((current_time, running_process.id))
+            current_time += 1
+            running_process.burst_time -= 1
 
         if running_process and running_process.burst_time == 0:
-            schedule.append((current_time, running_process.id))
-            waiting_time += (current_time - running_process.arrive_time)
+            # use original process burst time which is not modified to calculate waiting time
+            original_process = next(iter([process for process in process_list if process.id == running_process.id and process.arrive_time == running_process.arrive_time]))
+            waiting_time += (current_time - running_process.arrive_time - original_process.burst_time)
             processes.remove(running_process)  # remove process from list once completed
             # select the process with the shortest burst time to run
             if not ready_queue:
@@ -143,6 +154,9 @@ def SRTF_scheduling(process_list):
                 # sort in ascending burst time
                 ready_queue = deque(sorted(ready_queue, key=lambda p: p.burst_time, reverse=False))
                 running_process = ready_queue.popleft()
+                change_of_running_process = True
+        else:
+            change_of_running_process = False
 
         completed = True if not running_process and not processes else False
         if completed:
@@ -185,9 +199,9 @@ def SJF_scheduling(process_list, alpha):
             # current running process has the shortest burst time based on prediction
             # other processes have to wait until it's completed
             # behave like FCFS here
-            current_time += running_process.burst_time
             schedule.append((current_time, running_process.id))
-            waiting_time += (current_time - running_process.arrive_time)
+            current_time += running_process.burst_time
+            waiting_time += (current_time - running_process.arrive_time - running_process.burst_time)
             future_predict[running_process.id]["last_actual_burst"] = running_process.burst_time  # update param for next prediciton
 
         # waiting for new process to arrive
@@ -239,7 +253,7 @@ def main(argv):
     write_output('SRTF.txt', SRTF_schedule, SRTF_avg_waiting_time )
 
     print ("simulating SJF ----")
-    SJF_schedule, SJF_avg_waiting_time =  SJF_scheduling(process_list, alpha = 0.5)
+    SJF_schedule, SJF_avg_waiting_time =  SJF_scheduling(process_list, alpha = 0.2)
     write_output('SJF.txt', SJF_schedule, SJF_avg_waiting_time )
 
 
